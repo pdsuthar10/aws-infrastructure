@@ -1,7 +1,5 @@
 provider "aws" {
   version = "~> 2.0"
-  access_key = var.access_key
-  secret_key = var.secret_key
   region     = var.region
 }
 # create the VPC
@@ -11,7 +9,7 @@ resource "aws_vpc" "My_VPC" {
   enable_dns_support   = var.dnsSupport
   enable_dns_hostnames = var.dnsHostNames
   tags = {
-    Name = "My VPC"
+    Name = "${var.vpcName}-${timestamp()}"
   }
 } # end resource
 resource "aws_subnet" "public" {
@@ -21,6 +19,10 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
   cidr_block = var.subnet_cidrs_public[count.index]
   availability_zone = var.availability_zones[count.index]
+
+  tags={
+    Name = "${var.vpcName}-${timestamp()} Subnet ${count.index+1}"
+  }
 }
 
 # Create the Security Group
@@ -56,8 +58,8 @@ resource "aws_default_security_group" "My_VPC_Security_Group" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = {
-    Name = "My VPC Security Group"
-    Description = "My VPC Security Group"
+    Name = "${var.vpcName}-${timestamp()} Security Group"
+    Description = "${var.vpcName}-${timestamp()} Security Group"
   }
 } # end resource
 
@@ -65,7 +67,7 @@ resource "aws_default_security_group" "My_VPC_Security_Group" {
 resource "aws_internet_gateway" "My_VPC_GW" {
   vpc_id = aws_vpc.My_VPC.id
   tags = {
-    Name = "My VPC Internet Gateway"
+    Name = "${var.vpcName}-${timestamp()} Internet Gateway"
   }
 } # end resource
 
@@ -77,7 +79,7 @@ resource "aws_default_route_table" "My_VPC_route_table" {
     gateway_id = aws_internet_gateway.My_VPC_GW.id
   }
   tags = {
-    Name = "My VPC Route Table"
+    Name = "${var.vpcName}-${timestamp()} Route Table"
   }
 } # end resource
 # Associate the Route Table with the Subnet

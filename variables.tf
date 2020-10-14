@@ -1,15 +1,6 @@
 # variables.tf
-variable "access_key" {
-  default = "AKIAUS7V3CVLSUSQRMUB"
-}
-variable "secret_key" {
-  default = "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"
-}
 variable "region" {
   default = "us-east-1"
-}
-variable "availabilityZone" {
-  default = "us-east-1a"
 }
 variable "instanceTenancy" {
   default = "default"
@@ -19,6 +10,10 @@ variable "dnsSupport" {
 }
 variable "dnsHostNames" {
   default = true
+}
+variable "vpcName"{
+  description = "For VPC - Name "
+  type = string
 }
 variable "vpcCIDRblock" {
   default = "10.0.0.0/16"
