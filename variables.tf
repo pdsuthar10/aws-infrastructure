@@ -77,4 +77,8 @@ variable "appPort" {
   type=string
   default="3000"
 }
+variable "dev_account" {
+  type = string
+  default = "315658802519"
+}
 # end of variables.tf

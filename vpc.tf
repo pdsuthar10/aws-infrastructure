@@ -130,6 +130,7 @@ resource "aws_s3_bucket" "bucket" {
   force_destroy = true
   acl    = "private"
 
+
   lifecycle_rule {
     enabled = true
 
@@ -148,6 +149,14 @@ resource "aws_s3_bucket" "bucket" {
     }
   }
 
+}
+
+resource "aws_s3_bucket_public_access_block" "s3Public" {
+  bucket = aws_s3_bucket.bucket.id
+  ignore_public_acls = true
+  block_public_acls = true
+  block_public_policy = true
+  restrict_public_buckets = true
 }
 
 
@@ -257,8 +266,7 @@ resource "aws_iam_instance_profile" "EC2_S3_Role" {
 
 
 data "aws_ami" "custom_AMI" {
-  owners = ["self"]
-  most_recent = true
+  owners = [var.dev_account]
   filter {
     name = "name"
     values = ["csye6225_*"]
