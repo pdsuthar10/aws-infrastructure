@@ -53,7 +53,6 @@ variable "bucketName" {
 }
 variable "db_user" {
   type=string
-  default="csye6225fall2020"
 }
 variable "db_password" {
   type=string
@@ -79,6 +78,5 @@ variable "appPort" {
 }
 variable "dev_account" {
   type = string
-  default = "315658802519"
 }
 # end of variables.tf
