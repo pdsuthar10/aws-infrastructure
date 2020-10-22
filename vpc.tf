@@ -174,7 +174,7 @@ resource "aws_db_subnet_group" "db_subnet" {
 resource "aws_db_instance" "RDS_Instance" {
   skip_final_snapshot  = true
   engine               = "mysql"
-  instance_class       = "db.t2.micro"
+  instance_class       = "db.t3.micro"
   multi_az             = false
   username             = var.db_user
   password             = var.db_password
