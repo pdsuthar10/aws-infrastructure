@@ -271,6 +271,7 @@ data "aws_ami" "custom_AMI" {
     name = "name"
     values = ["csye6225_*"]
   }
+  most_recent = true
 }
 
 
