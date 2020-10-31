@@ -124,7 +124,9 @@ resource "aws_security_group" "database_sg" {
 }
 
 
-# S3 Bucket
+###################################
+#         S3 BUCKET               #
+###################################
 resource "aws_s3_bucket" "bucket" {
   bucket = var.bucketName
   force_destroy = true
@@ -160,7 +162,9 @@ resource "aws_s3_bucket_public_access_block" "s3Public" {
 }
 
 
-# RDS Database Subnet Group
+###################################
+#               RDS               #
+###################################
 resource "aws_db_subnet_group" "db_subnet" {
   name       = "db_subnet"
   subnet_ids = [aws_subnet.public[0].id,aws_subnet.public[1].id,aws_subnet.public[2].id]
@@ -188,7 +192,10 @@ resource "aws_db_instance" "RDS_Instance" {
   engine_version       = "5.7"
 }
 
-#IAM Polciies
+
+###################################
+#      IAM POLICIES               #
+###################################
 resource "aws_iam_policy" "My_S3_Policy" {
   name        = "WebAppS3"
   description = "My S3 Bucket Policy"
@@ -213,10 +220,173 @@ resource "aws_iam_policy" "My_S3_Policy" {
 EOF
 }
 
+# Policy for EC2 Role
+# This policy allows to read & upload data from S3 bucket
+resource "aws_iam_policy" "CodeDeploy-EC2-S3" {
+  name = "CodeDeploy-EC2-S3"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "s3:Get*",
+        "s3:List*"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}/*"
+      ]
+    }
+  ]
+}
+EOF
+}
 
-# IAM Roles
+resource "aws_iam_policy" "GH-Upload-To-S3" {
+  name = "UploadToS3"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:Get*",
+                "s3:List*"
+            ],
+            "Resource": [
+                "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}/*"
+            ]
+        }
+    ]
+}
+EOF
+}
+
+data "aws_caller_identity" "current" {}
+
+locals {
+  user_account_id = data.aws_caller_identity.current.account_id
+}
+
+resource "aws_iam_policy" "GH-Code-Deploy" {
+  name = "GH-Code-Deploy"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:RegisterApplicationRevision",
+        "codedeploy:GetApplicationRevision"
+      ],
+      "Resource": [
+        "arn:aws:codedeploy:${var.region}:${local.user_account_id}:application:${aws_codedeploy_app.code_deploy_app.name}"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:CreateDeployment",
+        "codedeploy:GetDeployment"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:GetDeploymentConfig"
+      ],
+      "Resource": [
+        "arn:aws:codedeploy:${var.region}:${local.user_account_id}:deploymentconfig:CodeDeployDefault.OneAtATime",
+        "arn:aws:codedeploy:${var.region}:${local.user_account_id}:deploymentconfig:CodeDeployDefault.HalfAtATime",
+        "arn:aws:codedeploy:${var.region}:${local.user_account_id}:deploymentconfig:CodeDeployDefault.AllAtOnce"
+      ]
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_policy" "packer" {
+  name = "PackerPolicy"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:AttachVolume",
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:CopyImage",
+                "ec2:CreateImage",
+                "ec2:CreateKeypair",
+                "ec2:CreateSecurityGroup",
+                "ec2:CreateSnapshot",
+                "ec2:CreateTags",
+                "ec2:CreateVolume",
+                "ec2:DeleteKeyPair",
+                "ec2:DeleteSecurityGroup",
+                "ec2:DeleteSnapshot",
+                "ec2:DeleteVolume",
+                "ec2:DeregisterImage",
+                "ec2:DescribeImageAttribute",
+                "ec2:DescribeImages",
+                "ec2:DescribeInstances",
+                "ec2:DescribeInstanceStatus",
+                "ec2:DescribeRegions",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSnapshots",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeTags",
+                "ec2:DescribeVolumes",
+                "ec2:DetachVolume",
+                "ec2:GetPasswordData",
+                "ec2:ModifyImageAttribute",
+                "ec2:ModifyInstanceAttribute",
+                "ec2:ModifySnapshotAttribute",
+                "ec2:RegisterImage",
+                "ec2:RunInstances",
+                "ec2:StopInstances",
+                "ec2:TerminateInstances"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+EOF
+}
+
+resource "aws_iam_user_policy_attachment" "ghactions_s3_policy_attach" {
+  policy_arn = aws_iam_policy.GH-Upload-To-S3.arn
+  user = data.aws_iam_user.deployUser.user_name
+}
+
+resource "aws_iam_user_policy_attachment" "ghactions_codedeploy_policy_attach" {
+  policy_arn = aws_iam_policy.GH-Code-Deploy.arn
+  user = data.aws_iam_user.deployUser.user_name
+}
+
+resource "aws_iam_user_policy_attachment" "ghactions_packer_policy_attach" {
+  policy_arn = aws_iam_policy.packer.arn
+  user = data.aws_iam_user.deployUser.user_name
+}
+
+data "aws_iam_user" "deployUser" {
+  user_name = "ghactions"
+}
+
+###################################
+#      IAM ROLES                  #
+###################################
 resource "aws_iam_role" "My_EC2_Role" {
-  name = "EC2-CSYE6225"
+  name = "CodeDeployEC2ServiceRole"
 
   assume_role_policy = <<EOF
 {
@@ -240,6 +410,12 @@ resource "aws_iam_role_policy_attachment" "attach-policy" {
   role       = aws_iam_role.My_EC2_Role.name
   policy_arn = aws_iam_policy.My_S3_Policy.arn
 }
+
+resource "aws_iam_role_policy_attachment" "codedeploy-ec2-s3-attach-policy" {
+  role       = aws_iam_role.My_EC2_Role.name
+  policy_arn = aws_iam_policy.CodeDeploy-EC2-S3.arn
+}
+
 
 # DynamoDB Table
 resource "aws_dynamodb_table" "My_Dynamodb_Table" {
@@ -274,8 +450,9 @@ data "aws_ami" "custom_AMI" {
   most_recent = true
 }
 
-
-# EC2 Instance
+###################################
+#      EC2 INSTANCE               #
+###################################
 resource "aws_instance" "EC2_Instance" {
   ami = data.aws_ami.custom_AMI.id
   instance_type = "t2.micro"
@@ -301,5 +478,68 @@ resource "aws_instance" "EC2_Instance" {
     delete_on_termination = true
   }
   depends_on = [aws_db_instance.RDS_Instance]
+  tags = {
+    Name = "Webapp Server"
+    WebappServer = "CI/CD"
+  }
+}
+
+###################################
+#      CODE DEPLOY                #
+###################################
+resource "aws_iam_role" "CodeDeployServiceRole" {
+  name = "CodeDeployServiceRole"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "codedeploy.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "AWSCodeDeployRole" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+  role       = aws_iam_role.CodeDeployServiceRole.name
+}
+
+
+resource "aws_codedeploy_app" "code_deploy_app" {
+  compute_platform = "Server"
+  name             = "csye6225-webapp"
+}
+
+resource "aws_codedeploy_deployment_group" "code_deploy_deployment_group" {
+  app_name              = aws_codedeploy_app.code_deploy_app.name
+  deployment_group_name = "csye6225-webapp-deployment"
+  deployment_config_name = "CodeDeployDefault.AllAtOnce"
+  service_role_arn      = aws_iam_role.CodeDeployServiceRole.arn
+
+  ec2_tag_filter {
+    key   = "WebappServer"
+    type  = "KEY_AND_VALUE"
+    value = "CI/CD"
+  }
+
+  deployment_style {
+    deployment_option = "WITHOUT_TRAFFIC_CONTROL"
+    deployment_type   = "IN_PLACE"
+  }
+
+  auto_rollback_configuration {
+    enabled = true
+    events  = ["DEPLOYMENT_FAILURE"]
+  }
+
+  depends_on = [aws_codedeploy_app.code_deploy_app]
 }
 # end vpc.tf

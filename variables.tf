@@ -79,4 +79,12 @@ variable "appPort" {
 variable "dev_account" {
   type = string
 }
+variable "environment" {
+  type = string
+  description = "Enter an environment bucket to deploy artifacts to."
+}
+variable "domainName" {
+  type = string
+  description = "Enter your domain name."
+}
 # end of variables.tf
