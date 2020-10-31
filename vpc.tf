@@ -244,7 +244,7 @@ EOF
 }
 
 resource "aws_iam_policy" "GH-Upload-To-S3" {
-  name = "UploadToS3"
+  name = "CodeDeploy-EC2-S3"
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -257,6 +257,7 @@ resource "aws_iam_policy" "GH-Upload-To-S3" {
                 "s3:List*"
             ],
             "Resource": [
+                "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}
                 "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}/*"
             ]
         }
