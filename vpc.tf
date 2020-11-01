@@ -244,7 +244,7 @@ EOF
 }
 
 resource "aws_iam_policy" "GH-Upload-To-S3" {
-  name = "CodeDeploy-EC2-S3"
+  name = "GH-Upload-To-S3"
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -257,7 +257,7 @@ resource "aws_iam_policy" "GH-Upload-To-S3" {
                 "s3:List*"
             ],
             "Resource": [
-                "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}
+                "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}",
                 "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}/*"
             ]
         }
@@ -542,5 +542,17 @@ resource "aws_codedeploy_deployment_group" "code_deploy_deployment_group" {
   }
 
   depends_on = [aws_codedeploy_app.code_deploy_app]
+}
+
+data "aws_route53_zone" "selected" {
+  name         = "${var.environment}.${var.domainName}"
+}
+
+resource "aws_route53_record" "serverRecord" {
+  zone_id = data.aws_route53_zone.selected.zone_id
+  name    = "api.${data.aws_route53_zone.selected.name}"
+  type    = "A"
+  ttl     = "60"
+  records = [aws_instance.EC2_Instance.public_ip]
 }
 # end vpc.tf
