@@ -1,5 +1,9 @@
+provider "aws" {
+  version = "~> 2.0"
+  region     = "us-east-1"
+}
 resource "aws_iam_policy" "Packer-Policy" {
-  name = "Packer"
+  name = "Packer-Policy"
   policy = <<EOF
 {
   "Version": "2012-10-17",
