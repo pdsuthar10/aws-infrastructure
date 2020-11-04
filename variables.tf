@@ -42,14 +42,8 @@ variable "subnet_cidrs_public" {
   type = list(string)
 }
 
-variable "availability_zones" {
-  default = ["us-east-1a","us-east-1b","us-east-1c"]
-  type = list(string)
-}
-
 variable "bucketName" {
   type=string
-  default="webapp.priyam.suthar"
 }
 variable "db_user" {
   type=string
@@ -59,22 +53,18 @@ variable "db_password" {
 }
 variable "db_name" {
   type=string
-  default="csye6225"
 }
 variable "db_identifier" {
   type=string
-  default="csye6225-f20"
 }
 variable "dynamodb_table_name" {
   type=string
-  default="csye6225"
 }
 variable "ssh_key" {
   type=string
 }
 variable "appPort" {
   type=string
-  default="3000"
 }
 variable "dev_account" {
   type = string

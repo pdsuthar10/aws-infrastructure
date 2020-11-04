@@ -11,14 +11,17 @@ resource "aws_vpc" "My_VPC" {
   tags = {
     Name = "${var.vpcName}-${timestamp()}"
   }
-} # end resource
+}
+
+data "aws_availability_zones" "availability_zones" {}
+
 resource "aws_subnet" "public" {
   count = length(var.subnet_cidrs_public)
 
   vpc_id = aws_vpc.My_VPC.id
   map_public_ip_on_launch = true
   cidr_block = var.subnet_cidrs_public[count.index]
-  availability_zone = var.availability_zones[count.index]
+  availability_zone = data.aws_availability_zones.availability_zones.names[count.index]
 
   tags={
     Name = "${var.vpcName}-${timestamp()} Subnet ${count.index+1}"
@@ -314,56 +317,6 @@ resource "aws_iam_policy" "GH-Code-Deploy" {
 EOF
 }
 
-resource "aws_iam_policy" "packer" {
-  name = "PackerPolicy"
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:AttachVolume",
-                "ec2:AuthorizeSecurityGroupIngress",
-                "ec2:CopyImage",
-                "ec2:CreateImage",
-                "ec2:CreateKeypair",
-                "ec2:CreateSecurityGroup",
-                "ec2:CreateSnapshot",
-                "ec2:CreateTags",
-                "ec2:CreateVolume",
-                "ec2:DeleteKeyPair",
-                "ec2:DeleteSecurityGroup",
-                "ec2:DeleteSnapshot",
-                "ec2:DeleteVolume",
-                "ec2:DeregisterImage",
-                "ec2:DescribeImageAttribute",
-                "ec2:DescribeImages",
-                "ec2:DescribeInstances",
-                "ec2:DescribeInstanceStatus",
-                "ec2:DescribeRegions",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeSnapshots",
-                "ec2:DescribeSubnets",
-                "ec2:DescribeTags",
-                "ec2:DescribeVolumes",
-                "ec2:DetachVolume",
-                "ec2:GetPasswordData",
-                "ec2:ModifyImageAttribute",
-                "ec2:ModifyInstanceAttribute",
-                "ec2:ModifySnapshotAttribute",
-                "ec2:RegisterImage",
-                "ec2:RunInstances",
-                "ec2:StopInstances",
-                "ec2:TerminateInstances"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-EOF
-}
-
 resource "aws_iam_user_policy_attachment" "ghactions_s3_policy_attach" {
   policy_arn = aws_iam_policy.GH-Upload-To-S3.arn
   user = data.aws_iam_user.deployUser.user_name
@@ -371,11 +324,6 @@ resource "aws_iam_user_policy_attachment" "ghactions_s3_policy_attach" {
 
 resource "aws_iam_user_policy_attachment" "ghactions_codedeploy_policy_attach" {
   policy_arn = aws_iam_policy.GH-Code-Deploy.arn
-  user = data.aws_iam_user.deployUser.user_name
-}
-
-resource "aws_iam_user_policy_attachment" "ghactions_packer_policy_attach" {
-  policy_arn = aws_iam_policy.packer.arn
   user = data.aws_iam_user.deployUser.user_name
 }
 
@@ -554,5 +502,6 @@ resource "aws_route53_record" "serverRecord" {
   type    = "A"
   ttl     = "60"
   records = [aws_instance.EC2_Instance.public_ip]
+  depends_on = [aws_instance.EC2_Instance]
 }
 # end vpc.tf
