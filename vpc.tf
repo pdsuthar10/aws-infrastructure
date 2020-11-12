@@ -32,12 +32,6 @@ resource "aws_subnet" "public" {
 resource "aws_security_group" "Application_SG"  {
   # allow ingress of port 22
   vpc_id = aws_vpc.My_VPC.id
-  ingress {
-    cidr_blocks = var.ingressCIDRblock
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-  }
 
   ingress {
     cidr_blocks = var.ingressCIDRblock
@@ -514,6 +508,12 @@ resource "aws_iam_role_policy_attachment" "AWSCodeDeployRole" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
   role       = aws_iam_role.CodeDeployServiceRole.name
 }
+
+resource "aws_iam_role_policy_attachment" "CloudWatchAgent_EC2Policy" {
+  role = aws_iam_role.My_EC2_Role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
 
 
 resource "aws_codedeploy_app" "code_deploy_app" {
