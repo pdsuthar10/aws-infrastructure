@@ -89,7 +89,6 @@ resource "aws_security_group" "loadBalancer_SG" {
 #     APPLICATION SG      #
 ###########################
 resource "aws_security_group" "Application_SG"  {
-  # allow ingress of port 22
   vpc_id = aws_vpc.My_VPC.id
 
   ingress {
@@ -487,36 +486,36 @@ data "aws_ami" "custom_AMI" {
 ###################################
 #      EC2 INSTANCE               #
 ###################################
-resource "aws_instance" "EC2_Instance" {
-  ami = data.aws_ami.custom_AMI.id
-  instance_type = "t2.micro"
-  disable_api_termination = false
-  vpc_security_group_ids = [aws_security_group.Application_SG.id]
-  key_name = var.ssh_key
-  user_data     = templatefile("${path.module}/user_data.sh",
-  {
-    aws_bucket_name = var.bucketName,
-    aws_db_name = aws_db_instance.RDS_Instance.name,
-    aws_db_username = aws_db_instance.RDS_Instance.username,
-    aws_db_password = aws_db_instance.RDS_Instance.password,
-    aws_region = var.region,
-    aws_db_host = aws_db_instance.RDS_Instance.address,
-    aws_app_port = var.appPort
-  })
-  iam_instance_profile = aws_iam_instance_profile.EC2_S3_Role.name
-  subnet_id = aws_subnet.public[0].id
-  associate_public_ip_address = true
-  root_block_device {
-    volume_type = "gp2"
-    volume_size = 20
-    delete_on_termination = true
-  }
-  depends_on = [aws_db_instance.RDS_Instance]
-  tags = {
-    Name = "Webapp Server"
-    WebappServer = "CI/CD"
-  }
-}
+//resource "aws_instance" "EC2_Instance" {
+//  ami = data.aws_ami.custom_AMI.id
+//  instance_type = "t2.micro"
+//  disable_api_termination = false
+//  vpc_security_group_ids = [aws_security_group.Application_SG.id]
+//  key_name = var.ssh_key
+//  user_data     = templatefile("${path.module}/user_data.sh",
+//  {
+//    aws_bucket_name = var.bucketName,
+//    aws_db_name = aws_db_instance.RDS_Instance.name,
+//    aws_db_username = aws_db_instance.RDS_Instance.username,
+//    aws_db_password = aws_db_instance.RDS_Instance.password,
+//    aws_region = var.region,
+//    aws_db_host = aws_db_instance.RDS_Instance.address,
+//    aws_app_port = var.appPort
+//  })
+//  iam_instance_profile = aws_iam_instance_profile.EC2_S3_Role.name
+//  subnet_id = aws_subnet.public[0].id
+//  associate_public_ip_address = true
+//  root_block_device {
+//    volume_type = "gp2"
+//    volume_size = 20
+//    delete_on_termination = true
+//  }
+//  depends_on = [aws_db_instance.RDS_Instance]
+//  tags = {
+//    Name = "Webapp Server"
+//    WebappServer = "CI/CD"
+//  }
+//}
 
 ###################################
 #      CODE DEPLOY                #
