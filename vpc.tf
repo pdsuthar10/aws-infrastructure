@@ -596,22 +596,6 @@ resource "aws_codedeploy_deployment_group" "code_deploy_deployment_group" {
 }
 
 ###################################
-#            ROUTE 53             #
-###################################
-data "aws_route53_zone" "selected" {
-  name         = "${var.environment}.${var.domainName}"
-}
-
-resource "aws_route53_record" "serverRecord" {
-  zone_id = data.aws_route53_zone.selected.zone_id
-  name    = "api.${data.aws_route53_zone.selected.name}"
-  type    = "A"
-  ttl     = "60"
-  records = [aws_instance.EC2_Instance.public_ip]
-  depends_on = [aws_instance.EC2_Instance]
-}
-
-###################################
 #   ASG LAUNCH CONFIGURATION      #
 ###################################
 resource "aws_launch_configuration" "ASG_LaunchConfiguration" {
