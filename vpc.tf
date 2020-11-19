@@ -744,11 +744,11 @@ resource "aws_cloudwatch_metric_alarm" "CPU-High-Alarm" {
   namespace           = "AWS/EC2"
   period              = "60"
   statistic           = "Average"
-  threshold           = "90"
+  threshold           = "5"
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.autoscaling_group.name
   }
-  alarm_description = "Scale-up if CPU Utilization > 90% for 1 minute"
+  alarm_description = "Scale-up if CPU Utilization > 5% for 1 minute"
   alarm_actions     = [ aws_autoscaling_policy.server-scaleUp-policy.arn ]
 }
 
@@ -760,11 +760,11 @@ resource "aws_cloudwatch_metric_alarm" "CPU-Low-Alarm" {
   namespace           = "AWS/EC2"
   period              = "60"
   statistic           = "Average"
-  threshold           = "70"
+  threshold           = "3"
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.autoscaling_group.name
   }
-  alarm_description = "Scale-down if CPU Utilization < 70% for 1 minute"
+  alarm_description = "Scale-down if CPU Utilization < 3% for 1 minute"
   alarm_actions     = [ aws_autoscaling_policy.server-scaleDown-policy.arn ]
 }
 
