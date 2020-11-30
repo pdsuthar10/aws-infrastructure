@@ -777,7 +777,6 @@ resource "aws_sns_topic" "user_updates" {
 }
 
 data "aws_iam_policy_document" "sns_topic_policy" {
-  policy_id = "__default_policy_ID"
 
   statement {
     actions = [
@@ -811,8 +810,6 @@ data "aws_iam_policy_document" "sns_topic_policy" {
     resources = [
       aws_sns_topic.user_updates.arn,
     ]
-
-    sid = "__default_statement_ID"
   }
 }
 
@@ -848,7 +845,109 @@ resource "aws_iam_role_policy_attachment" "ec2_sns" {
 
 
 
+###########################
+#       LAMBDA            #
+###########################
 
+#IAM role for lambda
+resource "aws_iam_role" "iam_for_lambda" {
+  name = "iam_for_lambda"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+#lambda function
+resource "aws_lambda_function" "lamda_sns_updates" {
+  filename      = "lambda_function_payload.zip"
+  function_name = "lambda_function_name"
+  role          = aws_iam_role.iam_for_lambda.arn
+  handler       = "index.handler"
+
+  # The filebase64sha256() function is available in Terraform 0.11.12 and later
+  # For Terraform 0.11.11 and earlier, use the base64sha256() function and the file() function:
+  # source_code_hash = "${base64sha256(file("lambda_function_payload.zip"))}"
+  source_code_hash = filebase64sha256("lambda_function_payload.zip")
+
+  runtime = "nodejs12.x"
+}
+
+#SNS topic subscription to Lambda
+resource "aws_sns_topic_subscription" "lambda" {
+  topic_arn = aws_sns_topic.user_updates.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.lamda_sns_updates.arn
+}
+
+#SNS Lambda permission
+resource "aws_lambda_permission" "allow_from_sns" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lamda_sns_updates.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.user_updates.arn
+}
+
+#Lambda Policy
+resource "aws_iam_policy" "lambda_policy" {
+  name        = "lambda_policy"
+  description = "Policy for cloud watch and code deploy"
+  policy      = <<EOF
+{
+   "Version": "2012-10-17",
+   "Statement": [
+       {
+           "Effect": "Allow",
+           "Action": [
+               "logs:CreateLogGroup",
+               "logs:CreateLogStream",
+               "logs:PutLogEvents"
+           ],
+           "Resource": "*"
+       },
+       {
+         "Sid": "LambdaDynamoDBAccess",
+         "Effect": "Allow",
+         "Action": [
+             "dynamodb:GetItem",
+             "dynamodb:PutItem",
+             "dynamodb:UpdateItem"
+         ],
+         "Resource": "arn:aws:dynamodb:${var.region}:${local.user_account_id}:table/${var.dynamodb_table_name}"
+       },
+       {
+         "Sid": "LambdaSESAccess",
+         "Effect": "Allow",
+         "Action": [
+             "ses:VerifyEmailAddress",
+             "ses:SendEmail",
+             "ses:SendRawEmail"
+         ],
+         "Resource": "*"
+       }
+   ]
+}
+ EOF
+}
+
+#Attach the policy for Lambda iam role
+resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.lambda_policy.arn
+}
 
 
 
