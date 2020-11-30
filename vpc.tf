@@ -769,6 +769,83 @@ resource "aws_cloudwatch_metric_alarm" "CPU-Low-Alarm" {
 }
 
 
+############################
+#            SNS           #
+############################
+resource "aws_sns_topic" "user_updates" {
+  name = "user_updates"
+}
+
+data "aws_iam_policy_document" "sns_topic_policy" {
+  policy_id = "__default_policy_ID"
+
+  statement {
+    actions = [
+      "SNS:Subscribe",
+      "SNS:SetTopicAttributes",
+      "SNS:RemovePermission",
+      "SNS:Receive",
+      "SNS:Publish",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:GetTopicAttributes",
+      "SNS:DeleteTopic",
+      "SNS:AddPermission",
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceOwner"
+
+      values = [
+        local.user_account_id,
+      ]
+    }
+
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    resources = [
+      aws_sns_topic.user_updates.arn,
+    ]
+
+    sid = "__default_statement_ID"
+  }
+}
+
+resource "aws_sns_topic_policy" "user_updates_policy" {
+  arn = aws_sns_topic.user_updates.arn
+  policy = data.aws_iam_policy_document.sns_topic_policy.json
+}
+
+# IAM policy for SNS
+resource "aws_iam_policy" "sns_iam_policy" {
+  name = "ec2_iam_policy"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "SNS:Publish"
+      ],
+      "Resource": "${aws_sns_topic.user_updates.arn}"
+    }
+  ]
+}
+EOF
+}
+
+# Attach the SNS topic policy to the EC2 role
+resource "aws_iam_role_policy_attachment" "ec2_sns" {
+  policy_arn = aws_iam_policy.sns_iam_policy.arn
+  role = aws_iam_role.My_EC2_Role.name
+}
+
 
 
 
