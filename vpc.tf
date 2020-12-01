@@ -285,10 +285,30 @@ resource "aws_iam_policy" "GH-Upload-To-S3" {
             ],
             "Resource": [
                 "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}",
-                "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}/*"
+                "arn:aws:s3:::codedeploy.${var.environment}.${var.domainName}/*",
+                "arn:aws:s3:::lambda.${var.environment}.${var.domainName}/*"
             ]
         }
     ]
+}
+EOF
+}
+
+resource "aws_iam_policy" "GH-Lambda" {
+  name = "GH-Lambda"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "lambda:*"
+        ],
+
+      "Resource": "arn:aws:lambda:${var.region}:${local.user_account_id}:function:${aws_lambda_function.lambda_sns_updates.function_name}"
+    }
+  ]
 }
 EOF
 }
@@ -405,6 +425,11 @@ resource "aws_iam_user_policy_attachment" "ghactions_packer_policy_attach" {
   user = data.aws_iam_user.deployUser.user_name
 }
 
+resource "aws_iam_user_policy_attachment" "ghactions_lambda_policy_attach" {
+  policy_arn = aws_iam_policy.GH-Lambda.arn
+  user = data.aws_iam_user.deployUser.user_name
+}
+
 data "aws_iam_user" "deployUser" {
   user_name = "ghactions"
 }
@@ -452,13 +477,21 @@ resource "aws_dynamodb_table" "My_Dynamodb_Table" {
   billing_mode   = "PROVISIONED"
   read_capacity  = 20
   write_capacity = 20
-  hash_key       = "id"
+  hash_key       = "email_hash"
 
   attribute {
-    name = "id"
+    name = "email_hash"
     type = "S"
   }
 
+  ttl {
+    attribute_name = "ttl"
+    enabled = true
+  }
+
+  tags = {
+    Name = var.dynamodb_table_name
+  }
 }
 
 
@@ -611,7 +644,10 @@ resource "aws_launch_configuration" "ASG_LaunchConfiguration" {
     aws_db_password = aws_db_instance.RDS_Instance.password,
     aws_region = var.region,
     aws_db_host = aws_db_instance.RDS_Instance.address,
-    aws_app_port = var.appPort
+    aws_app_port = var.appPort,
+    aws_environment = var.environment,
+    aws_domainName = var.domainName,
+    aws_topic_arn = aws_sns_topic.user_updates.arn
   })
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.EC2_S3_Role.name
@@ -777,7 +813,6 @@ resource "aws_sns_topic" "user_updates" {
 }
 
 data "aws_iam_policy_document" "sns_topic_policy" {
-  policy_id = "__default_policy_ID"
 
   statement {
     actions = [
@@ -811,8 +846,6 @@ data "aws_iam_policy_document" "sns_topic_policy" {
     resources = [
       aws_sns_topic.user_updates.arn,
     ]
-
-    sid = "__default_statement_ID"
   }
 }
 
@@ -848,8 +881,131 @@ resource "aws_iam_role_policy_attachment" "ec2_sns" {
 
 
 
+###########################
+#       LAMBDA            #
+###########################
 
+#IAM role for lambda
+resource "aws_iam_role" "iam_for_lambda" {
+  name = "iam_for_lambda"
 
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+#lambda function
+resource "aws_lambda_function" "lambda_sns_updates" {
+  filename      = "lambda_function_payload.zip"
+  function_name = "lambda_email_updates"
+  role          = aws_iam_role.iam_for_lambda.arn
+  handler       = "index.handler"
+
+  # The filebase64sha256() function is available in Terraform 0.11.12 and later
+  # For Terraform 0.11.11 and earlier, use the base64sha256() function and the file() function:
+  # source_code_hash = "${base64sha256(file("lambda_function_payload.zip"))}"
+  source_code_hash = filebase64sha256("lambda_function_payload.zip")
+
+  runtime = "nodejs12.x"
+}
+
+resource "aws_cloudwatch_log_group" "lambda_log_group" {
+  name              = "/aws/lambda/${var.lambda_function_name}"
+}
+
+resource "aws_lambda_alias" "lambda_alias" {
+  name             = "email-notification"
+  description      = "Lambda alias for sending emails to users"
+  function_name    = aws_lambda_function.lambda_sns_updates.arn
+  function_version = "$LATEST"
+}
+
+#SNS topic subscription to Lambda
+resource "aws_sns_topic_subscription" "lambda" {
+  topic_arn = aws_sns_topic.user_updates.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.lambda_sns_updates.arn
+}
+
+#SNS Lambda permission
+resource "aws_lambda_permission" "allow_from_sns" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_sns_updates.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.user_updates.arn
+}
+
+#Lambda Policy
+resource "aws_iam_policy" "lambda_policy" {
+  name        = "lambda_policy"
+  description = "Policy for cloud watch and code deploy"
+  policy      = <<EOF
+{
+   "Version": "2012-10-17",
+   "Statement": [
+       {
+           "Effect": "Allow",
+           "Action": [
+               "logs:CreateLogGroup"
+           ],
+           "Resource": "*"
+       },
+        {
+           "Effect": "Allow",
+           "Action": [
+               "logs:CreateLogStream",
+               "logs:PutLogEvents"
+           ],
+           "Resource": "*"
+       },
+       {
+         "Sid": "LambdaDynamoDBAccess",
+         "Effect": "Allow",
+         "Action": [
+             "dynamodb:GetItem",
+             "dynamodb:PutItem",
+             "dynamodb:UpdateItem"
+         ],
+         "Resource": "arn:aws:dynamodb:${var.region}:${local.user_account_id}:table/${var.dynamodb_table_name}"
+       },
+       {
+         "Sid": "LambdaSESAccess",
+         "Effect": "Allow",
+         "Action": [
+             "ses:VerifyEmailAddress",
+             "ses:SendEmail",
+             "ses:SendRawEmail"
+         ],
+         "Resource": "*",
+          "Condition":{
+            "StringEquals":{
+              "ses:FromAddress":"${var.fromAddress}@${var.environment}.${var.domainName}"
+            }
+          }
+       }
+   ]
+}
+ EOF
+}
+
+#Attach the policy for Lambda iam role
+resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.lambda_policy.arn
+}
 
 
 
