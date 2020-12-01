@@ -77,4 +77,13 @@ variable "domainName" {
   type = string
   description = "Enter your domain name."
 }
+
+variable "fromAddress" {
+  type = string
+  description = "Enter the address before @ for emails to send"
+}
+
+variable "lambda_function_name" {
+  default = "lambda_email_updates"
+}
 # end of variables.tf
