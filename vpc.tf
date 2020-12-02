@@ -92,7 +92,6 @@ resource "aws_security_group" "Application_SG"  {
   vpc_id = aws_vpc.My_VPC.id
 
   ingress {
-    cidr_blocks = var.ingressCIDRblock
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
@@ -958,10 +957,8 @@ resource "aws_iam_policy" "lambda_policy" {
    "Statement": [
        {
            "Effect": "Allow",
-           "Action": [
-               "logs:CreateLogGroup"
-           ],
-           "Resource": "*"
+           "Action": "logs:CreateLogGroup",
+           "Resource": "arn:aws:logs:${var.region}:${local.user_account_id}:*"
        },
         {
            "Effect": "Allow",
@@ -969,7 +966,9 @@ resource "aws_iam_policy" "lambda_policy" {
                "logs:CreateLogStream",
                "logs:PutLogEvents"
            ],
-           "Resource": "*"
+           "Resource": [
+              "arn:aws:logs:${var.region}:${local.user_account_id}:log-group:/aws/lambda/${aws_lambda_function.lambda_sns_updates.function_name}:*"
+          ]
        },
        {
          "Sid": "LambdaDynamoDBAccess",
