@@ -920,17 +920,6 @@ resource "aws_lambda_function" "lambda_sns_updates" {
   runtime = "nodejs12.x"
 }
 
-resource "aws_cloudwatch_log_group" "lambda_log_group" {
-  name              = "/aws/lambda/${var.lambda_function_name}"
-}
-
-resource "aws_lambda_alias" "lambda_alias" {
-  name             = "email-notification"
-  description      = "Lambda alias for sending emails to users"
-  function_name    = aws_lambda_function.lambda_sns_updates.arn
-  function_version = "$LATEST"
-}
-
 #SNS topic subscription to Lambda
 resource "aws_sns_topic_subscription" "lambda" {
   topic_arn = aws_sns_topic.user_updates.arn
@@ -976,7 +965,9 @@ resource "aws_iam_policy" "lambda_policy" {
          "Action": [
              "dynamodb:GetItem",
              "dynamodb:PutItem",
-             "dynamodb:UpdateItem"
+             "dynamodb:UpdateItem",
+              "dynamodb:Scan",
+              "dynamodb:DeleteItem"
          ],
          "Resource": "arn:aws:dynamodb:${var.region}:${local.user_account_id}:table/${var.dynamodb_table_name}"
        },
