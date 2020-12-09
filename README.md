@@ -59,6 +59,13 @@ creating a VPC, 3 subnets in 3 different Availability regions, an Internet Gatew
 
 3. run `terraform destroy` and input all the required parameters specific to that particular VPC. This is to terminate the entire network stack.
 
+## Import Certificate to AWS Certificate Manager
+```shell
+$ aws acm import-certificate --certificate fileb://Certificate.pem \
+      --certificate-chain fileb://CertificateChain.pem \
+      --private-key fileb://PrivateKey.pem 
+```
+
 ## Files Information
 
 1.  "vpc.tf"     - This file has the entire network infrastructure that will setup all networking resources.

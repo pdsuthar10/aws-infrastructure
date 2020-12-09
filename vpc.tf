@@ -59,13 +59,6 @@ resource "aws_security_group" "loadBalancer_SG" {
   vpc_id        =  aws_vpc.My_VPC.id
 
   ingress{
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks  = var.ingressCIDRblock
-  }
-
-  ingress{
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -216,7 +209,21 @@ resource "aws_db_instance" "RDS_Instance" {
   allocated_storage    = 20
   storage_type         = "gp2"
   engine_version       = "5.7"
+  parameter_group_name = aws_db_parameter_group.db_parameter_group.name
+  storage_encrypted = true
 }
+
+resource "aws_db_parameter_group" "db_parameter_group" {
+  name = "rds-pg"
+  family = "mysql5.7"
+
+  parameter {
+    name  = "performance_schema"
+    value = "1"
+    apply_method = "pending-reboot"
+  }
+}
+
 
 
 ###################################
@@ -701,8 +708,9 @@ resource "aws_lb" "application-loadBalancer" {
 
 resource "aws_lb_listener" "webapp-listener" {
   load_balancer_arn = aws_lb.application-loadBalancer.arn
-  port              = "80"
-  protocol          = "HTTP"
+  port              = "443"
+  protocol          = "HTTPS"
+  certificate_arn   = data.aws_acm_certificate.ssl_certificate.arn
 
   default_action {
     type             = "forward"
@@ -997,5 +1005,9 @@ resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
   policy_arn = aws_iam_policy.lambda_policy.arn
 }
 
+data "aws_acm_certificate" "ssl_certificate" {
+  domain      = "${var.environment}.${var.domainName}"
+  most_recent = true
+}
 
 
